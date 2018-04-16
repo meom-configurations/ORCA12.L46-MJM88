@@ -1,2 +1,2 @@
-# ORCA12-MJM88
-ORCA12-MJM88 configuration performed at DRAKKAR/MEOM
+# ORCA12.L46-MJM88
+ORCA12.L46-MJM88 configuration performed at DRAKKAR/MEOM
