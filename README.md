@@ -58,4 +58,4 @@ This repository hold the code, and configuration files usefull for running this 
 
 
 ### Bibliography:
-Molines J.M., B. Barnier, T. Penduff, A.M. Treguier, J. Le Sommer. "ORCA12.L46 climatological and inter annual simulations forced with DFS4.4: GJM02 and MJM88.",  Drakkar Group Experiment report GDRI-DRAKKAR-2014-03-19 (2014)  [https://www.drakkar-ocean.eu/publications/reports/orca12_reference_experiments_2014](Technical Report)
+Molines J.M., B. Barnier, T. Penduff, A.M. Treguier, J. Le Sommer. "ORCA12.L46 climatological and inter annual simulations forced with DFS4.4: GJM02 and MJM88.",  Drakkar Group Experiment report GDRI-DRAKKAR-2014-03-19 (2014) [Technical Report](https://www.drakkar-ocean.eu/publications/reports/orca12_reference_experiments_2014)
