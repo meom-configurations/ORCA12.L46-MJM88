@@ -1,0 +1,8 @@
+&namexper
+ CEXPER = 'ORCA12.L46-MJM88'
+ ln_dimgnnn=.false.
+ ! rdtwr =  1.
+/
+ &namchoice
+ ln_ssf=.true.
+/

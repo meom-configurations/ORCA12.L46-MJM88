@@ -1,0 +1,236 @@
+      SUBROUTINE trcdit_wr(kt)
+   !!===========================================================================================
+   !!
+   !!                       ROUTINE trcdit_wr     key_dimgout
+   !!===========================================================================================
+   !!
+   !! Purpose :
+   !!---------
+   !!          Standard output of passive tracer : concentration fields
+   !!
+   !!
+   !! Method :
+   !! -------
+   !!
+   !!
+   !!        At each time step accumulates the sum of the fields if necessary
+   !!        Each nwritetrc time step, output the instantaneous or mean fields
+   !!
+   !!        IF kindic <0, output of fields before the model interruption.
+   !!        IF kindic =0, time step loop
+   !!        IF kindic >0, output of fields before the time step loop
+   !!
+   !! Input :
+   !! -----
+   !!   argument
+   !!           kt              : time step
+   !!           kindic          : indicator of abnormal termination
+   !!
+   !! External:
+   !! -----
+   !!               dia_wri_dimg
+   !!
+   !! History:
+   !! --------
+   !!   original  : 05-10 (Z. Lashkar and J.M. Molines )
+   !!   revision  : 2 Nov 2009 J. Simeon
+   !!==================================================================================================!
+   !! * Modules used
+    USE par_oce
+    USE par_trc
+    USE trc
+    USE trcnam
+    USE in_out_manager 
+
+   !! * Arguments
+   INTEGER, INTENT( in ) ::   kt         ! ocean time-step
+
+   !! * Local declarations
+   INTEGER :: iyear,iday, jn, jl
+   INTEGER :: jpinv, iost, invid, invid2, j2d, jp2dminv   
+   REAL(wp), DIMENSION(:,:,:), ALLOCATABLE :: trc2dINV 
+   REAL(wp), DIMENSION(:,:,:), ALLOCATABLE :: trc2dMINV 
+   REAL(wp) :: ztraf, zmean
+
+
+#if defined key_dimgout
+   INTEGER ::  imon, jk
+
+   CHARACTER(LEN=80) :: cltext, clmode, clname
+    INTEGER  ::  ialloc
+    INTEGER :: nsto=0
+   REAL(wp), ALLOCATABLE, SAVE, DIMENSION (:,:,:,:) ::  trm
+   REAL(wp) :: zcoef
+   REAL(wp), DIMENSION(:,:,:), ALLOCATABLE :: zinv 
+
+#if defined key_diainstant
+   LOGICAL, PARAMETER :: ll_dia_inst=.TRUE.  !: for instantaneous output
+#else
+   LOGICAL, PARAMETER :: ll_dia_inst=.FALSE. !: for average output
+#endif
+
+#endif
+
+! Allocate some things
+      IF ( jp_cfc_2d /= 0 .AND. jp_c14b_2d /= 0 ) THEN
+       jpinv =  jp_cfc_2d + jp_c14b_2d
+      ELSEIF ( jp_cfc_2d /= 0 .AND. jp_c14b_2d == 0 ) THEN
+       jpinv = jp_cfc_2d 
+      ELSEIF ( jp_cfc_2d == 0 .AND. jp_c14b_2d /= 0 ) THEN
+       jpinv = jp_c14b_2d
+      ELSE
+       jpinv = 0
+      ENDIF
+
+      jp2dminv = jpdia2d - jp_cfc_2d - jp_c14b_2d
+
+!     IF(lwp) THEN
+!         WRITE(numout,*) '       TRCDIT_WR_DIMG.H90  Check variables needed'
+!         WRITE(numout,*) '       jpi and jpj are ', jpi, jpj
+!         WRITE(numout,*) '       jp_cfc_2d and jp_c14b_2d are ',jp_cfc_2d, jp_c14b_2d 
+!         WRITE(numout,*) '       jpinv is currently ', jpinv
+!     ENDIF
+ 
+
+      IF ( jpinv /= 0 ) THEN
+        IF ( ALLOCATED(trc2dINV) ) THEN
+          trc2dINV = 0.0
+        ELSE
+          ALLOCATE( trc2dINV(jpi,jpj,jpinv) )  
+          trc2dINV = 0.0
+        ENDIF
+      ENDIF
+
+      IF ( jp2dminv /= 0 ) THEN
+        IF ( ALLOCATED(trc2dMINV) ) THEN
+          trc2dMINV = 0.0
+        ELSE
+          ALLOCATE( trc2dMINV(jpi,jpj,jp2dminv) )  
+          trc2dMINV = 0.0
+        ENDIF
+      ENDIF
+
+     ALLOCATE( zinv(jpi,jpj,jptra+jp_cfc_2d+jp_c14b_2d) )
+
+     IF( .NOT. ALLOCATED(trm) )THEN
+       ALLOCATE(trm(jpi,jpj,jpk,jptra),&
+                STAT=ialloc )
+     ENDIF
+
+      IF( kt == nit000  ) THEN
+      trm(:,:,:,:)=0
+      ENDIF
+
+! Compute mean values
+      IF (ll_dia_inst ) THEN
+!       nothing to do
+      ELSE
+         nsto=nsto+1
+         trm(:,:,:,:) = trm(:,:,:,:) + trn(:,:,:,:)
+      END IF
+! code for dimg mpp output
+      IF ( MOD(kt-nit000+1,nn_writetrc) == 0 ) THEN
+         IF (ll_dia_inst ) THEN
+            trm = trn
+         ELSE
+            trm = trm / nsto
+         ENDIF
+         WRITE(clmode,'(f5.1,a)' ) nn_writetrc*rdt/86400.,' days average'
+         iyear = ndastp/10000
+         imon = (ndastp-iyear*10000)/100
+         iday = ndastp - imon*100 - iyear*10000
+         DO jn=1,jptra
+           WRITE(clname,9000) TRIM(cexper),'TRC',jn,iyear,imon,iday
+!           WRITE(clname,9000) TRIM(cexper),TRIM(ctrcnm(jn)),iyear,imon,iday
+           cltext=TRIM(cexper)//' tracers '//TRIM(clmode)
+           ! this coef is for eventual scaling purpose for the tracer fields
+           zcoef=1.
+           IF ( ctrcnm(jn) == 'C14B' ) zcoef = 1.
+           CALL dia_wri_dimg (clname, cltext, trm(:,:,:,jn)*zcoef, jpk, 'T', cn_dirout)
+         END DO
+ 9000   FORMAT(a,"_",a,i2.2,"_y",i4.4,"m",i2.2,"d",i2.2,".dimgproc")
+         nsto=0
+         trm(:,:,:,:)=0.e0
+
+
+!#if defined key_trc_diaadd
+  
+        IF ( jpdia2d /= 0 ) THEN 
+! Compute tracer inventory (2D fields put into zinv )
+
+         zinv(:,:,:) = 0.
+         DO jn=1, jptra
+            DO jk= 1, jpk
+               zinv(:,:,jn) = zinv(:,:,jn) +  trn(:,:,jk,jn)*fse3t(:,:,jk)
+            END DO
+         END DO
+
+         IF ( jp_cfc_2d /= 0 ) THEN   ! loop is not performed if no CFCS !
+           DO j2d=1,jp_cfc_2d-1
+             invid=jp_cfc0_2d + j2d - 1
+             trc2dINV(:,:,j2d)=trc2d(:,:,invid)
+           ENDDO
+         invid=jp_cfc_2d 
+         trc2dINV(:,:,invid)= zinv(:,:,jp_cfc0)    ! inventory of CFC-11 (if any) put on last CFC 2d index
+         ENDIF
+
+         IF ( jp_c14b_2d /= 0 ) THEN  ! loop is not performed if no C14b !
+           DO j2d=1,jp_c14b_2d-1
+             invid=jp_c14b0_2d + j2d - 1
+             invid2=jpinv-jp_c14b_2d
+             trc2dINV(:,:,invid2)=trc2d(:,:,invid)
+           ENDDO
+         trc2dINV(:,:,jpinv)= zinv(:,:,jp_c14b0) ! inventory of C14b (if any) put on last C14b 2d index
+         ENDIF
+
+         ! also save air-sea fluxes and cumulated air-sea fluxes.
+         ! already computed in the respective sms routine
+
+         WRITE(clname,9001) TRIM(cexper),'INVQTR',iyear,imon,iday
+         cltext=TRIM(cexper)//' inventory and fluxes'//TRIM(clmode)
+         CALL dia_wri_dimg (clname, cltext, trc2dINV(:,:,:), jpinv, 'T', cn_dirout)
+
+         j2d = 1
+         DO jn=1, jpdia2d
+            IF ( jn >= jp_cfc0_2d .AND. jn <= jp_cfc1_2d ) THEN
+                  ! do nothing
+            ELSEIF ( jn >= jp_c14b0_2d .AND. jn <= jp_c14b1_2d ) THEN
+                  ! do nothing
+            ELSE
+                trc2dMINV(:,:,j2d) = trc2d(:,:,jn)
+                j2d = j2d + 1
+            ENDIF
+         END DO
+
+         WRITE(clname,9001) TRIM(cexper),'TRC2D',iyear,imon,iday
+         cltext=TRIM(cexper)//' TOP 2D diag fields'//TRIM(clmode)
+         CALL dia_wri_dimg (clname, cltext, trc2dMINV(:,:,:), jp2dminv, 'T', cn_dirout)
+       ENDIF
+
+
+         DO jn=1,jpdia3d
+           WRITE(clname,9003) TRIM(cexper),'TRC3D',jn,iyear,imon,iday
+           cltext=TRIM(cexper)//' TOP 3D diag fields '//TRIM(clmode)
+           ! this coef is for eventual scaling purpose for the tracer fields
+           zcoef=1.
+           CALL dia_wri_dimg (clname, cltext, trc3d(:,:,:,jn)*zcoef, jpk, 'T', cn_dirout)
+         END DO
+
+!#endif
+ 9001   FORMAT(a,"_",a,"_y",i4.4,"m",i2.2,"d",i2.2,".dimgproc")
+ 9003   FORMAT(a,"_",a,i2.2,"_y",i4.4,"m",i2.2,"d",i2.2,".dimgproc")
+      ENDIF      
+
+        IF ( ALLOCATED(trc2dMINV) ) THEN
+           DEALLOCATE(trc2dMINV)
+        ENDIF
+ 
+
+        IF ( ALLOCATED(trc2dINV) ) THEN
+           DEALLOCATE(trc2dINV)
+        ENDIF
+
+        DEALLOCATE(zinv)
+
+END SUBROUTINE trcdit_wr
+
